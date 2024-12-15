@@ -10,7 +10,7 @@
 - **自定义假名范围**：用户可自由选择需要练习的平假名或片假名。
 - **动态正确率统计**：实时显示学习过程中的正确率。
 - **手写绘图功能**：支持手写输入平假名或片假名。
-- **支持多平台**：Windows、macOS、Linux。
+- **支持多平台**：Windows
 
 ---
 
@@ -21,8 +21,6 @@
 点击以下链接下载适合您平台的版本：
 
 - [Windows 64位](https://github.com/CloudGee/fiftysound/releases/latest/download/FiftySoundApp_windows_amd64.exe)
-- [macOS](https://github.com/CloudGee/fiftysound/releases/latest/download/FiftySoundApp_darwin_amd64)
-- [Linux 64位](https://github.com/CloudGee/fiftysound/releases/latest/download/FiftySoundApp_linux_amd64)
 
 下载完成后，按照您的操作系统运行即可。
 

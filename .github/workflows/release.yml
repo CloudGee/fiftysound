@@ -6,6 +6,7 @@ on:
     - "v*"
   workflow_dispatch:
 
+
 jobs:
   build:
     name: Build for Multiple Platforms
@@ -28,22 +29,12 @@ jobs:
       run: |
         fyne-cross windows -arch amd64 -output FiftySoundApp --app-id com.fiftysound
 
-    - name: Build for macOS
-      run: |
-        fyne-cross darwin -arch amd64 -output FiftySoundApp --app-id com.fiftysound
-
-    - name: Build for Linux
-      run: |
-        fyne-cross linux -arch amd64 -output FiftySoundApp --app-id com.fiftysound
-
     - name: Upload artifacts
       uses: actions/upload-artifact@v3
       with:
         name: build-artifacts
         path: |
           fyne-cross/dist/windows-amd64/FiftySoundApp.exe
-          fyne-cross/dist/darwin-amd64/FiftySoundApp
-          fyne-cross/dist/linux-amd64/FiftySoundApp
 
   release:
     name: Release Application
@@ -61,8 +52,6 @@ jobs:
       with:
         artifacts: |
           fyne-cross/dist/windows-amd64/FiftySoundApp.exe
-          fyne-cross/dist/darwin-amd64/FiftySoundApp
-          fyne-cross/dist/linux-amd64/FiftySoundApp
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
