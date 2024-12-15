@@ -103,7 +103,7 @@ func main() {
 			return
 		}
 		targets := getTargets(hiraganaCheck.Checked, katakanaCheck.Checked)
-		if len(targets) < 2 {
+		if len(targets) < 3 {
 			dialog.ShowInformation("提示", "请选择至少2个假名进行练习。", w)
 			return
 		}
