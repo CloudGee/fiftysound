@@ -445,7 +445,7 @@ func showModeTwo(a fyne.App, targets []string, mainWin fyne.Window, hSelected, k
 		currentKana = pool.next()
 
 		if val, ok := kanaToRomaji[currentKana]; ok && len(val) > 0 {
-			currentRomaji = val[rand.Intn(len(val))]
+			currentRomaji = val[0]
 		} else {
 			currentRomaji = "a"
 			currentKana = "あ"
