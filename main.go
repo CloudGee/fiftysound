@@ -103,7 +103,7 @@ func main() {
 			return
 		}
 		targets := getTargets(hiraganaCheck.Checked, katakanaCheck.Checked)
-		if len(targets) < 3 {
+		if len(targets) < 2 {
 			dialog.ShowInformation("提示", "请选择至少2个假名进行练习。", w)
 			return
 		}
@@ -150,7 +150,6 @@ func getAllHiragana() []string {
 func getTargets(h, k bool) []string {
 	var result []string
 	if len(selectedChars) == 0 {
-		// 用户未选择则返回空，不进行练习
 		return result
 	}
 
@@ -172,11 +171,9 @@ func getTargets(h, k bool) []string {
 		}
 		lineData := gojuon[pos.lineIndex]
 
-		// 如果用户选择了平假名
 		if h && pos.colIndex < len(lineData.hiragana) {
 			result = append(result, lineData.hiragana[pos.colIndex])
 		}
-		// 如果用户选择了片假名
 		if k && pos.colIndex < len(lineData.katakana) {
 			result = append(result, lineData.katakana[pos.colIndex])
 		}
@@ -185,7 +182,7 @@ func getTargets(h, k bool) []string {
 	return result
 }
 
-// 弹出选择假名的对话框：只显示平假名
+// 显示选择假名的对话框
 func showKanaSelectionDialog(a fyne.App, parent fyne.Window) {
 	var lineChecks []*widget.Check
 	var checks []struct {
@@ -195,7 +192,6 @@ func showKanaSelectionDialog(a fyne.App, parent fyne.Window) {
 	}
 
 	allRandomCheck := widget.NewCheck("全部随机(包含所有五十音)", nil)
-
 	grid := container.NewVBox(allRandomCheck)
 
 	for _, line := range gojuon {
@@ -205,7 +201,6 @@ func showKanaSelectionDialog(a fyne.App, parent fyne.Window) {
 		rowItems := []fyne.CanvasObject{lineCheck}
 		var lineCharChecks []*widget.Check
 
-		// 只显示平假名
 		for _, hchar := range line.hiragana {
 			c := widget.NewCheck(hchar, nil)
 			if contains(selectedChars, hchar) {
@@ -220,6 +215,7 @@ func showKanaSelectionDialog(a fyne.App, parent fyne.Window) {
 			rowItems = append(rowItems, c)
 		}
 
+		// 行选中变化时更新本行所有项
 		currentLineCharChecks := lineCharChecks
 		lineCheck.OnChanged = func(checked bool) {
 			for _, c := range currentLineCharChecks {
@@ -227,9 +223,10 @@ func showKanaSelectionDialog(a fyne.App, parent fyne.Window) {
 			}
 		}
 
-		for _, c := range lineCharChecks {
-			c := c
-			c.OnChanged = func(_ bool) {
+		// 字项变化时更新行选中状态
+		for _, c := range currentLineCharChecks {
+			c2 := c
+			c2.OnChanged = func(_ bool) {
 				allSelected := true
 				for _, cc := range currentLineCharChecks {
 					if !cc.Checked {
@@ -251,6 +248,36 @@ func showKanaSelectionDialog(a fyne.App, parent fyne.Window) {
 		grid.Add(row)
 	}
 
+	// 恢复时，如果没有全选，则保持当前状态
+	// 如果用户之前选了整行，应当此时也更新行选择框的状态
+	for i, line := range gojuon {
+		// 对每行检查是否已全选
+		lineCheck := lineChecks[i]
+		// 找出该行所有假名
+		hiraganas := line.hiragana
+		allSelected := true
+		for _, hchar := range hiraganas {
+			if !contains(selectedChars, hchar) {
+				allSelected = false
+				break
+			}
+		}
+		lineCheck.OnChanged = nil
+		lineCheck.SetChecked(allSelected)
+		lineCheck.OnChanged = func(checked bool) {
+			// 找到该行对应的字check并更新
+			var lineCharChecks []*widget.Check
+			for _, c := range checks {
+				if c.line == lineCheck && contains(hiraganas, c.char) {
+					lineCharChecks = append(lineCharChecks, c.check)
+				}
+			}
+			for _, c := range lineCharChecks {
+				c.SetChecked(checked)
+			}
+		}
+	}
+
 	allRandomCheck.OnChanged = func(checked bool) {
 		if checked {
 			for _, lc := range lineChecks {
@@ -264,11 +291,16 @@ func showKanaSelectionDialog(a fyne.App, parent fyne.Window) {
 		} else {
 			for _, lc := range lineChecks {
 				lc.Enable()
-				lc.SetChecked(false)
+				// 恢复初始状态：不自动清空用户之前勾选，因为用户可能想重新调整
+				// 这里不强制取消全选，以保持用户的状态
+				// 如果想要恢复全部未选中，可以启用下面代码：
+				// lc.SetChecked(false)
 			}
 			for _, item := range checks {
 				item.check.Enable()
-				item.check.SetChecked(false)
+				// 同理这里不强制取消勾选，因为用户可能想在不全随机的情况下修改
+				// 如需强制清空可加:
+				// item.check.SetChecked(false)
 			}
 		}
 	}
@@ -302,27 +334,53 @@ func showKanaSelectionDialog(a fyne.App, parent fyne.Window) {
 	dialogWin.Show()
 }
 
-// 模式一： 假名 => 罗马音
+// KanaPool 用于在练习中轮流出现不重复的题目，
+// 用完之后重新洗牌，以确保每个假名都出现后才重复。
+type KanaPool struct {
+	items []string
+	index int
+}
+
+func newKanaPool(targets []string) *KanaPool {
+	p := &KanaPool{
+		items: make([]string, len(targets)),
+	}
+	copy(p.items, targets)
+	p.shuffle()
+	return p
+}
+
+func (p *KanaPool) shuffle() {
+	rand.Shuffle(len(p.items), func(i, j int) {
+		p.items[i], p.items[j] = p.items[j], p.items[i]
+	})
+	p.index = 0
+}
+
+func (p *KanaPool) next() string {
+	if p.index >= len(p.items) {
+		p.shuffle()
+	}
+	k := p.items[p.index]
+	p.index++
+	return k
+}
+
+// 模式一： 假名 => 罗马音（使用 KanaPool 确保每个假名轮询出现）
 func showModeOne(a fyne.App, targets []string, mainWin fyne.Window, stats *Stats, statsLabel *widget.Label, hSelected, kSelected bool) {
 	w := a.NewWindow("模式一")
 	question := widget.NewLabel("")
 	answerEntry := widget.NewEntry()
 	feedback := widget.NewLabel("")
 
+	pool := newKanaPool(targets)
+
 	var currentKana string
-	var previousKana string
 
 	nextQuestion := func() {
 		answerEntry.SetText("")
 		feedback.SetText("")
-		for {
-			currentKana = randomOne(targets)
-			if currentKana != previousKana || len(targets) == 1 {
-				break
-			}
-		}
-		previousKana = currentKana
-
+		currentKana = pool.next()
 		prompt := ""
 		if isHiragana(currentKana) {
 			prompt = fmt.Sprintf("请输入平假名 %s 的罗马音：", currentKana)
@@ -365,30 +423,26 @@ func showModeOne(a fyne.App, targets []string, mainWin fyne.Window, stats *Stats
 	w.Show()
 }
 
-// 模式二： 罗马音 => 假名手写
+// 模式二： 罗马音 => 假名手写（使用 KanaPool 确保每个假名轮询出现）
 func showModeTwo(a fyne.App, targets []string, mainWin fyne.Window, hSelected, kSelected bool) {
 	w := a.NewWindow("模式二")
 
 	question := widget.NewLabel("")
 	feedback := widget.NewLabel("正确答案: ")
-	var currentRomaji string
-	var currentKana string
-	var previousKana string
-
 	drawingArea := newDrawingWidget()
 	clearBtn := widget.NewButtonWithIcon("清空画布", theme.ContentClearIcon(), func() {
 		drawingArea.Clear()
 	})
 
+	pool := newKanaPool(targets)
+
+	var currentRomaji string
+	var currentKana string
+
 	nextQuestion := func() {
+		drawingArea.Clear()
 		feedback.SetText("正确答案: ")
-		for {
-			currentKana = randomOne(targets)
-			if currentKana != previousKana || len(targets) == 1 {
-				break
-			}
-		}
-		previousKana = currentKana
+		currentKana = pool.next()
 
 		if val, ok := kanaToRomaji[currentKana]; ok && len(val) > 0 {
 			currentRomaji = val[rand.Intn(len(val))]
@@ -409,7 +463,6 @@ func showModeTwo(a fyne.App, targets []string, mainWin fyne.Window, hSelected, k
 	})
 
 	nextBtn := widget.NewButton("下一题", func() {
-		drawingArea.Clear()
 		nextQuestion()
 	})
 
@@ -509,10 +562,6 @@ func (r *drawingRenderer) Objects() []fyne.CanvasObject {
 
 func (r *drawingRenderer) Destroy() {}
 
-func randomOne(list []string) string {
-	return list[rand.Intn(len(list))]
-}
-
 func checkRomaji(kana, ans string) bool {
 	if val, ok := kanaToRomaji[kana]; ok {
 		for _, correct := range val {
@@ -522,14 +571,6 @@ func checkRomaji(kana, ans string) bool {
 		}
 	}
 	return false
-}
-
-func getRandomRomaji(targets []string) (string, string) {
-	k := randomOne(targets)
-	if val, ok := kanaToRomaji[k]; ok && len(val) > 0 {
-		return val[0], k
-	}
-	return "a", "あ"
 }
 
 func reverseFindKana(romaji string) string {
