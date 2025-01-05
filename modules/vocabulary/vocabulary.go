@@ -71,7 +71,22 @@ func ShowVocabularyMainPage(myApp fyne.App, parent fyne.Window) {
 	progress := dialog.NewProgressInfinite("提示", "正在从GitHub请求最新词库...", parent)
 	progress.Show()
 
-	err := loadZipAndInit()
+	var err error
+	maxRetries := 3
+	retryDelay := 2 * time.Second
+
+	for i := 0; i < maxRetries; i++ {
+		err = loadZipAndInit()
+		if err == nil {
+			fmt.Println("Operation succeeded")
+			break
+		}
+
+		if i < maxRetries-1 {
+			time.Sleep(retryDelay)
+		}
+	}
+
 	progress.Hide()
 
 	if err != nil {
