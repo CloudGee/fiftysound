@@ -72,7 +72,7 @@ func ShowVocabularyMainPage(myApp fyne.App, parent fyne.Window) {
 	progress.Show()
 
 	var err error
-	maxRetries := 3
+	maxRetries := 4
 	retryDelay := 2 * time.Second
 
 	for i := 0; i < maxRetries; i++ {
